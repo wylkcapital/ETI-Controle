@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Manutenção Escolas ETI</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* A configuração do banco (URL e chave do Supabase) fica no bloco CONFIGURAÇÃO, perto do fim do arquivo. */
+body { margin: 0; }
+[hidden] { display: none !important; }
+
+/* Layout: medição de obra — avanço geral no topo, avanço por escola, e uma ficha por serviço com as etapas ponderadas (fundação → superestrutura → acabamento) */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --fg: #17212b; --muted: #5d6b78; --line: #d5dce3; --soft: #f5f7f9;
+  --accent: #1d4e89; --accent-fg: #ffffff; --track: #e1e6eb;
+  --st-ini: #b86e00; --st-and: #1f66c2; --st-con: #2b8a3e; --st-par: #c62828;
+  --st-ini-bg: #fff3dc; --st-and-bg: #e3eefc; --st-con-bg: #e2f4e6; --st-par-bg: #fde6e6;
+  --display: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "Barlow", "Segoe UI", Arial, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171d; --panel: #18212a; --fg: #e6ecf1; --muted: #93a2b0; --line: #2b3742; --soft: #1e2933;
+  --accent: #6aa3e8; --accent-fg: #0b1622; --track: #26323d;
+  --st-ini: #f0a93a; --st-and: #6aa8f0; --st-con: #5cc477; --st-par: #f07070;
+  --st-ini-bg: #3a2a10; --st-and-bg: #142a44; --st-con-bg: #143322; --st-par-bg: #3f1818;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11171d; --panel: #18212a; --fg: #e6ecf1; --muted: #93a2b0; --line: #2b3742; --soft: #1e2933;
+  --accent: #6aa3e8; --accent-fg: #0b1622; --track: #26323d;
+  --st-ini: #f0a93a; --st-and: #6aa8f0; --st-con: #5cc477; --st-par: #f07070;
+  --st-ini-bg: #3a2a10; --st-and-bg: #142a44; --st-con-bg: #143322; --st-par-bg: #3f1818;
+  color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 74rem; margin-inline: auto; padding: 1.25rem 16px 3rem; display: flex; flex-direction: column; gap: 1.25rem; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 2rem; font-weight: 700; }
+h2.sec { font-size: 1.3rem; font-weight: 600; }
+.sub { color: var(--muted); font-size: .9rem; margin-top: .2rem; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); border-radius: 8px; padding: .45rem .9rem; font-weight: 600; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.sm { padding: .3rem .7rem; font-size: .85rem; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* barra de progresso */
+.prog { height: 10px; background: var(--track); border-radius: 99px; overflow: hidden; }
+.prog > i { display: block; height: 100%; background: var(--c, var(--accent)); border-radius: 99px; transition: width .3s; }
+@media (prefers-reduced-motion: reduce) { .prog > i { transition: none; } }
+
+/* topo */
+.hero { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 1rem 1.1rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem 1.5rem; align-items: center; }
+.hero .big { font-family: var(--display); font-size: 3rem; font-weight: 600; line-height: 1; }
+.hero .lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.hero .prog { grid-column: 1 / -1; height: 14px; }
+.hero .prazo { text-align: right; font-size: .85rem; color: var(--muted); }
+.hero .prazo b { display: block; color: var(--fg); font-family: var(--display); font-size: 1.25rem; font-weight: 600; }
+.hero .prazo.late b { color: var(--st-par); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: .6rem; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--c, var(--line)); border-radius: var(--r); padding: .6rem .85rem; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: .1rem; }
+.tile[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--c, var(--accent)); }
+.tile.static { cursor: default; }
+.tile .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.tile .v { font-family: var(--display); font-size: 1.9rem; font-weight: 600; line-height: 1.05; }
+
+/* avanço por escola */
+.bysch { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .65rem; }
+.bysch .row { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) 3.2rem; gap: .75rem; align-items: center; cursor: pointer; background: none; border: 0; padding: .1rem 0; text-align: left; }
+.bysch .row .nm { font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bysch .row .pc { text-align: right; font-weight: 600; font-size: .9rem; }
+@media (max-width: 560px) { .bysch .row { grid-template-columns: minmax(0, 1fr) 3.2rem; } .bysch .row .prog { grid-column: 1 / -1; grid-row: 2; } }
+
+.filters { display: flex; flex-wrap: wrap; gap: .6rem; }
+.filters input, .filters select { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .7rem; min-width: 0; }
+.filters input { flex: 1 1 14rem; }
+.filters select { flex: 0 1 17rem; }
+.note { font-size: .85rem; color: var(--muted); margin: 0; }
+
+/* fichas */
+.schools { display: flex; flex-direction: column; gap: 1rem; }
+.school { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.school > header { padding: .9rem 1.1rem; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .45rem 1rem; align-items: center; }
+.school h3 { font-size: 1.3rem; font-weight: 600; }
+.school .spc { font-family: var(--display); font-size: 1.6rem; font-weight: 600; }
+.school > header .prog { grid-column: 1 / -1; }
+.school .origem { font-size: .75rem; color: var(--muted); display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.pill { border-radius: 99px; padding: .08rem .55rem; font-size: .74rem; font-weight: 600; border: 1px solid var(--line); background: var(--soft); color: var(--muted); white-space: nowrap; }
+.pill.urg { background: var(--st-par-bg); color: var(--st-par); border-color: var(--st-par); }
+.pill.st { background: var(--cb); color: var(--c); border-color: var(--c); }
+.svcs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); }
+.svc { padding: .9rem 1.1rem; border-top: 1px solid var(--line); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: .55rem; min-width: 0; }
+.svc .head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .8rem; align-items: start; }
+.svc .pri { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.svc h4 { font-size: 1.02rem; font-weight: 600; margin: .1rem 0 0; font-family: var(--body); }
+.svc .pc { font-family: var(--display); font-size: 1.9rem; font-weight: 600; line-height: 1; grid-row: 1 / 3; grid-column: 2; align-self: center; }
+.svc .desc { font-size: .85rem; color: var(--muted); }
+.svc .tags { display: flex; gap: .4rem; flex-wrap: wrap; }
+.etapas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.etapas li { display: grid; grid-template-columns: minmax(0, 1fr) 2.8rem; gap: .1rem .5rem; font-size: .8rem; align-items: center; }
+.etapas li .en { color: var(--fg); overflow-wrap: anywhere; }
+.etapas li .en small { color: var(--muted); }
+.etapas li .ep { text-align: right; color: var(--muted); }
+.etapas li .prog { grid-column: 1 / -1; height: 6px; }
+.obs { font-size: .85rem; background: var(--soft); border-radius: 6px; padding: .35rem .55rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.obs.par { background: var(--st-par-bg); color: var(--st-par); }
+.foot { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .76rem; color: var(--muted); }
+.lnk { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-weight: 600; font-size: .85rem; }
+
+/* editor de medição */
+.ed { display: flex; flex-direction: column; gap: .5rem; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: .7rem; }
+.ed .erow { display: grid; grid-template-columns: minmax(0, 1fr) 3.6rem 4.4rem 1.8rem; gap: .35rem; align-items: center; }
+.ed .erow.h { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.ed input, .ed textarea { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .35rem .45rem; min-width: 0; width: 100%; box-sizing: border-box; font-size: .85rem; }
+.ed input[type=number] { text-align: right; }
+.ed .x { background: none; border: 0; color: var(--st-par); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0; }
+.ed .quick { display: flex; gap: .3rem; flex-wrap: wrap; grid-column: 1 / -1; }
+.ed .quick button { border: 1px solid var(--line); background: var(--panel); border-radius: 99px; padding: .05rem .5rem; font-size: .72rem; cursor: pointer; }
+.ed .sum { font-size: .8rem; color: var(--muted); }
+.ed .sum.bad { color: var(--st-par); font-weight: 600; }
+.ed label.chk { display: flex; gap: .45rem; align-items: center; font-size: .85rem; }
+.ed .acts { display: flex; gap: .5rem; flex-wrap: wrap; }
+.empty { background: var(--panel); border: 1px dashed var(--line); border-radius: var(--r); padding: 2rem 1rem; text-align: center; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: .55rem 1rem; border-radius: 8px; font-size: .9rem; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100% - 32px); }
+.toast.on { opacity: 1; }
+
+/* extras da versão Supabase */
+.topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: .75rem; }
+.auth { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; font-size: .85rem; color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 1rem 1.1rem; display: grid; gap: .7rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+.panel h3 { grid-column: 1 / -1; font-size: 1.15rem; }
+.panel label { display: flex; flex-direction: column; gap: .25rem; font-size: .8rem; color: var(--muted); font-weight: 600; min-width: 0; }
+.panel label.chk { flex-direction: row; align-items: center; gap: .45rem; }
+.panel input, .panel select, .panel textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .6rem; color: var(--fg); font-weight: 400; font-size: .95rem; min-width: 0; }
+.panel .full { grid-column: 1 / -1; }
+.panel .acts { grid-column: 1 / -1; display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.panel .err { grid-column: 1 / -1; color: var(--st-par); font-size: .85rem; margin: 0; }
+.warnbox { background: var(--st-ini-bg); color: var(--fg); border: 1px solid var(--st-ini); border-radius: var(--r); padding: 1rem 1.1rem; }
+.warnbox code { background: var(--panel); padding: .05rem .3rem; border-radius: 4px; }
+.danger { color: var(--st-par) !important; }
+.confirm { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--st-par); }
+.btn.red { background: var(--st-par); border-color: var(--st-par); color: #fff; }
+
+/* evolução e histórico */
+.evo .tabs { display: flex; gap: .4rem; }
+.evo .tabs button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.evo .head2 { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.evo .row { cursor: default; }
+.ed .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .35rem; }
+.ed .grid2 label { display: flex; flex-direction: column; gap: .15rem; font-size: .72rem; color: var(--muted); font-weight: 600; }
+.ed .grid2 .full { grid-column: 1 / -1; }
+.ed .grid2 label.chk { flex-direction: row; align-items: center; }
+.hist { list-style: none; margin: 0; padding: 0; font-size: .78rem; color: var(--muted); display: flex; flex-direction: column; gap: .3rem; }
+.hist b { color: var(--fg); }
+.print-only { display: none; }
+
+@media print {
+  :root { --bg: #fff; --panel: #fff; --fg: #000; --muted: #444; --line: #bbb; --soft: #f3f3f3; color-scheme: light; }
+  body { font-size: 11px; }
+  .wrap { max-width: none; padding: 0; gap: .6rem; }
+  .auth, .filters, #msg, .lnk, .toast, #login, #addform, #cfgwarn, .ed, .evo .tabs { display: none !important; }
+  .print-only { display: block; }
+  .tile { cursor: default; }
+  .school, .svc, .bysch, .hero { break-inside: avoid; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>Manutenção das Escolas de Tempo Integral</h1>
+      <div class="sub" id="sub">Avanço físico dos serviços prioritários</div>
+      <div class="sub print-only" id="printed"></div>
+    </div>
+    <div class="auth" id="auth"></div>
+  </div>
+
+  <div class="warnbox" id="cfgwarn" hidden>
+    <b>Falta configurar o banco.</b> Abra este arquivo num editor de texto e preencha <code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code> no final do arquivo (Supabase › Project Settings › API).
+  </div>
+
+  <form class="panel" id="login" hidden>
+    <h3>Entrar para atualizar a medição</h3>
+    <label>E-mail<input id="l-email" type="email" autocomplete="username" required></label>
+    <label>Senha<input id="l-pass" type="password" autocomplete="current-password" required></label>
+    <p class="err" id="l-err" hidden></p>
+    <div class="acts"><button class="btn" type="submit" id="l-go">Entrar</button><button class="btn ghost" type="button" id="l-cancel">Cancelar</button></div>
+  </form>
+
+  <form class="panel" id="addform" hidden>
+    <h3>Novo serviço</h3>
+    <label>Escola<input id="a-escola" list="dl-esc" required placeholder="Ex.: E.E. Mário Barbosa"></label>
+    <label>Origem<input id="a-origem" list="dl-orig" required value="Plano ETI 2026"></label>
+    <label>Prioridade / item nº<input id="a-pri" type="number" min="1" value="1" required></label>
+    <label>Tipo<input id="a-tipo" list="dl-tipo" placeholder="Ex.: Quadra, Reforma, Estrutura"></label>
+    <label class="full">Serviço<input id="a-serv" required placeholder="Ex.: Cobertura da quadra"></label>
+    <label class="full">Descrição<textarea id="a-desc" rows="2"></textarea></label>
+    <label class="chk"><input id="a-urg" type="checkbox">Urgente (risco)</label>
+    <p class="note full">O serviço entra com etapas padrão (preliminares, fundação, superestrutura, cobertura/vedações, instalações, acabamentos). Ajuste depois em "Atualizar medição".</p>
+    <div class="acts"><button class="btn" type="submit" id="a-go">Salvar serviço</button><button class="btn ghost" type="button" id="a-cancel">Cancelar</button></div>
+    <datalist id="dl-esc"></datalist><datalist id="dl-orig"></datalist><datalist id="dl-tipo"></datalist>
+  </form>
+
+  <section class="hero" aria-label="Avanço geral">
+    <div>
+      <div class="lbl">Avanço físico geral</div>
+      <div class="big num" id="geral">—</div>
+    </div>
+    <div class="prazo" id="prazo"></div>
+    <div class="prog"><i id="geral-bar" style="width:0%"></i></div>
+  </section>
+
+  <section class="tiles" id="tiles" aria-label="Serviços por situação"></section>
+
+  <section class="bysch" aria-labelledby="h-esc">
+    <h2 class="sec" id="h-esc">Avanço por escola</h2>
+    <div id="bysch"></div>
+  </section>
+
+  <section class="bysch evo" aria-labelledby="h-evo">
+    <div class="head2">
+      <h2 class="sec" id="h-evo">Evolução do avanço geral</h2>
+      <div class="tabs"><button class="btn ghost sm" type="button" id="evo-sem" aria-pressed="true">Semanal</button><button class="btn ghost sm" type="button" id="evo-mes" aria-pressed="false">Mensal</button></div>
+    </div>
+    <div id="evo"></div>
+  </section>
+
+  <div class="filters">
+    <input id="q" type="search" placeholder="Buscar escola ou serviço" aria-label="Buscar">
+    <select id="fesc" aria-label="Filtrar por escola"><option value="">Todas as escolas</option></select>
+  </div>
+  <p class="note" id="msg">Carregando dados…</p>
+
+  <section class="schools" id="schools"></section>
+
+  <p class="note">Como o percentual é calculado: cada serviço é dividido em etapas com peso (somando 100%). O avanço do serviço é a soma de peso × % executado de cada etapa; o da escola e o geral são a média dos serviços. Cada alteração de % fica registrada no histórico do banco, com usuário e data.</p>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+/* ================== CONFIGURAÇÃO — preencha com os dados do seu projeto ================== */
+const SUPABASE_URL = 'https://xmhlnmxsmwrhnblxtkqu.supabase.co';        // ex.: https://abcdxyz.supabase.co
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtaGxubXhzbXdyaG5ibHh0a3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MTQ0MDMsImV4cCI6MjEwODA5MDQwM30.S4dBdEv2avZOw4BMootHOJVVqe_6cGg-7RGmq1F8iSU'; // chave "anon public" (NUNCA a service_role)
+const PRAZO = new Date('2026-10-31T23:59:59-03:00');     // prazo de referência do Plano ETI
+const PRAZO_TXT = 'Outubro de 2026';
+/* ========================================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const TEMPLATE = [['Serviços preliminares', 5], ['Fundação', 15], ['Superestrutura', 25], ['Cobertura e vedações', 25], ['Instalações', 15], ['Acabamentos e limpeza', 15]];
+
+let sb = null, session = null;
+let rows = [];
+let filtro = '', editing = null, draft = null, confirmDel = null, pendingReload = false;
+let meds = [], evoMode = 'sem'; const histOpen = new Set();
+
+const pctServ = (r) => { const t = r.etapas.reduce((a, e) => a + (+e.peso || 0), 0) || 1; return r.etapas.reduce((a, e) => a + (+e.peso || 0) * (+e.pct || 0), 0) / t; };
+const avg = (list) => list.length ? list.reduce((a, r) => a + pctServ(r), 0) / list.length : 0;
+const fmt = (n) => Math.round(n) + '%';
+const sit = (r) => { if (r.paralisado) return { v: 'Paralisado', k: 'par' }; const p = pctServ(r); if (p >= 99.5) return { v: 'Concluído', k: 'con' }; if (p > 0) return { v: 'Em andamento', k: 'and' }; return { v: 'A iniciar', k: 'ini' }; };
+const SITS = [{ v: 'A iniciar', k: 'ini' }, { v: 'Em andamento', k: 'and' }, { v: 'Paralisado', k: 'par' }, { v: 'Concluído', k: 'con' }];
+const colorFor = (p) => p >= 99.5 ? 'var(--st-con)' : p > 0 ? 'var(--st-and)' : 'var(--st-ini)';
+const bar = (p, c, h) => { const b = el('div', 'prog'); if (h) b.style.height = h; const i = el('i'); i.style.width = Math.max(0, Math.min(100, p)) + '%'; i.style.setProperty('--c', c || colorFor(p)); b.appendChild(i); return b; };
+const fmtData = (iso) => { try { const d = new Date(iso); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2600); }
+function msg(t) { $('msg').hidden = !t; $('msg').textContent = t || ''; }
+const escolas = () => { const m = []; rows.forEach(r => { if (!m.includes(r.escola)) m.push(r.escola); }); return m; };
+const canWrite = () => !!session;
+
+/* ---------- dados ---------- */
+async function load() {
+  const { data, error } = await sb.from('servicos').select('*, etapas(*)').order('escola').order('prioridade');
+  if (error) { msg('Não foi possível carregar os dados: ' + error.message); return; }
+  rows = data.map(r => Object.assign(r, { etapas: (r.etapas || []).sort((a, b) => a.ordem - b.ordem || a.id - b.id) }));
+  // mantém a ordem original das escolas (pela ordem de cadastro dos serviços)
+  rows.sort((a, b) => String(a.id).localeCompare(String(b.id), 'pt', { numeric: true }));
+  // shortcut: traz todo o histórico de uma vez; se passar de alguns milhares de linhas, filtrar por data
+  const m = await sb.from('medicoes').select('*').order('em');
+  meds = m.error ? [] : m.data;
+  msg(rows.length ? '' : 'Nenhum serviço cadastrado ainda.');
+  render();
+}
+let reloadT = null;
+function scheduleReload() {
+  if (editing) { pendingReload = true; return; }
+  clearTimeout(reloadT); reloadT = setTimeout(load, 400);
+}
+
+async function salvarMedicao(r) {
+  const tp = draft.etapas.reduce((a, e) => a + (+e.peso || 0), 0);
+  if (tp !== 100) { toast('Os pesos das etapas precisam somar 100%.'); return; }
+  if (!draft.servico.trim() || !draft.escola.trim()) { toast('Preencha o nome do serviço e a escola.'); return; }
+  const email = session && session.user ? session.user.email : null;
+  const origIds = r.etapas.map(e => e.id);
+  const keepIds = draft.etapas.filter(e => e.id).map(e => e.id);
+  const del = origIds.filter(id => !keepIds.includes(id));
+  try {
+    const ops = [];
+    if (del.length) ops.push(sb.from('etapas').delete().in('id', del));
+    draft.etapas.forEach((e, i) => {
+      const body = { nome: (e.nome || '').trim() || 'Etapa', peso: +e.peso || 0, pct: +e.pct || 0, ordem: i + 1 };
+      if (e.id) {
+        const o = r.etapas.find(x => x.id === e.id);
+        if (o && (o.nome !== body.nome || +o.peso !== body.peso || +o.pct !== body.pct || o.ordem !== body.ordem)) ops.push(sb.from('etapas').update(body).eq('id', e.id));
+      } else ops.push(sb.from('etapas').insert(Object.assign({ servico_id: r.id }, body)));
+    });
+    ops.push(sb.from('servicos').update({
+      servico: draft.servico.trim(), escola: draft.escola.trim(), prioridade: +draft.prioridade || 1, tipo: (draft.tipo || '').trim(),
+      descricao: (draft.descricao || '').trim(), urgente: !!draft.urgente,
+      paralisado: !!draft.paralisado, obs: (draft.obs || '').trim(), atualizado_em: new Date().toISOString(), atualizado_por: email }).eq('id', r.id));
+    const res = await Promise.all(ops);
+    const err = res.find(x => x.error);
+    if (err) throw err.error;
+    const detalhes = draft.etapas.map(e => { const o = e.id && r.etapas.find(x => x.id === e.id); return { nome: e.nome, de: o ? +o.pct : null, para: +e.pct }; }).filter(x => x.de !== x.para);
+    const h = await sb.from('medicoes').insert({ servico_id: r.id, pct: Math.round(pctServ({ etapas: draft.etapas }) * 10) / 10, detalhes, usuario: email });
+    editing = null; draft = null; toast(h.error ? 'Medição salva, mas o histórico não foi gravado: ' + h.error.message : 'Medição salva');
+    await load();
+  } catch (e) { toast('Não foi possível salvar: ' + (e.message || 'erro')); }
+}
+
+async function excluirServico(r) {
+  const { error } = await sb.from('servicos').delete().eq('id', r.id);
+  if (error) { toast('Não foi possível excluir: ' + error.message); return; }
+  editing = null; draft = null; confirmDel = null; toast('Serviço excluído'); await load();
+}
+
+/* ---------- topo ---------- */
+function renderAuth() {
+  const a = $('auth'); a.innerHTML = '';
+  if (!sb) return;
+  const pr = el('button', 'btn ghost sm', 'Imprimir / PDF'); pr.type = 'button'; pr.addEventListener('click', () => window.print()); a.appendChild(pr);
+  if (session) {
+    a.appendChild(el('span', null, session.user.email));
+    const add = el('button', 'btn sm', '+ Novo serviço'); add.type = 'button'; add.addEventListener('click', () => { $('addform').hidden = !$('addform').hidden; }); a.appendChild(add);
+    const out = el('button', 'btn ghost sm', 'Sair'); out.type = 'button'; out.addEventListener('click', async () => { await sb.auth.signOut(); }); a.appendChild(out);
+  } else {
+    const b = el('button', 'btn sm', 'Entrar para editar'); b.type = 'button'; b.addEventListener('click', () => { $('login').hidden = false; $('l-email').focus(); }); a.appendChild(b);
+  }
+}
+
+function renderTop() {
+  const g = avg(rows);
+  $('geral').textContent = rows.length ? fmt(g) : '—';
+  $('geral-bar').style.width = g + '%';
+  $('geral-bar').style.setProperty('--c', colorFor(g));
+  const dias = Math.ceil((PRAZO - new Date()) / 86400000);
+  const pz = $('prazo'); pz.innerHTML = '';
+  pz.append(document.createTextNode('Prazo de referência (Plano ETI)'), el('b', null, PRAZO_TXT), document.createTextNode(dias >= 0 ? `${dias} dia${dias === 1 ? '' : 's'} restantes` : `Prazo vencido há ${-dias} dia${dias === -1 ? '' : 's'}`));
+  pz.classList.toggle('late', dias < 0);
+
+  const t = $('tiles'); t.innerHTML = '';
+  const s1 = el('div', 'tile static'); s1.append(el('span', 'lbl', 'Escolas'), el('span', 'v num', String(escolas().length))); t.appendChild(s1);
+  const mk = (lbl, n, k, val) => { const b = el('button', 'tile'); b.type = 'button'; if (k) b.style.setProperty('--c', `var(--st-${k})`); b.setAttribute('aria-pressed', String(filtro === val)); b.append(el('span', 'lbl', lbl), el('span', 'v num', String(n))); b.addEventListener('click', () => { filtro = filtro === val ? '' : val; render(); }); t.appendChild(b); };
+  mk('Serviços', rows.length, null, '');
+  const u = rows.filter(r => r.urgente).length; if (u) mk('Urgentes', u, 'par', 'urgente');
+  SITS.forEach(s => mk(s.v, rows.filter(r => sit(r).v === s.v).length, s.k, s.v));
+
+  const bs = $('bysch'); bs.innerHTML = '';
+  escolas().forEach((e, idx) => {
+    const p = avg(rows.filter(r => r.escola === e));
+    const row = el('button', 'row'); row.type = 'button';
+    row.append(el('span', 'nm', e), bar(p), el('span', 'pc num', fmt(p)));
+    row.addEventListener('click', () => { $('fesc').value = e; render(); const c = $('esc-' + idx); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    bs.appendChild(row);
+  });
+
+  const fs = $('fesc'); const cur = fs.value; fs.innerHTML = '';
+  const o0 = el('option', null, 'Todas as escolas'); o0.value = ''; fs.appendChild(o0);
+  escolas().forEach(e => { const o = el('option', null, e); o.value = e; fs.appendChild(o); });
+  fs.value = escolas().includes(cur) ? cur : '';
+  const fill = (id, vals) => { const d = $(id); d.innerHTML = ''; [...new Set(vals.filter(Boolean))].forEach(v => { const o = el('option'); o.value = v; d.appendChild(o); }); };
+  fill('dl-esc', rows.map(r => r.escola)); fill('dl-orig', rows.map(r => r.origem)); fill('dl-tipo', rows.map(r => r.tipo));
+
+  const last = rows.map(r => r.atualizado_em).filter(Boolean).sort().pop();
+  $('sub').textContent = 'Avanço físico dos serviços prioritários' + (last ? ' · última medição ' + fmtData(last) : '');
+  renderEvo();
+}
+
+/* ---------- evolução semanal / mensal ---------- */
+// Fim de cada período (domingo ou último dia do mês), da primeira medição registrada até hoje.
+function fimPeriodos() {
+  if (!meds.length) return [];
+  const now = new Date(), ends = [];
+  let d = new Date(meds[0].em);
+  if (evoMode === 'sem') { d.setHours(23, 59, 59, 999); d.setDate(d.getDate() + (7 - d.getDay()) % 7); }
+  else d = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+  for (;;) {
+    ends.push(new Date(d));
+    if (d >= now) break;
+    d = evoMode === 'sem' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7, 23, 59, 59, 999) : new Date(d.getFullYear(), d.getMonth() + 2, 0, 23, 59, 59, 999);
+  }
+  return ends.slice(-12);
+}
+// Avanço geral numa data: último % registrado de cada serviço até ali.
+// Serviço sem nenhum registro no histórico conta com o % atual (já vinha assim antes do histórico existir).
+function geralEm(fim) {
+  if (!rows.length) return 0;
+  return rows.reduce((a, r) => {
+    const mine = meds.filter(m => m.servico_id === r.id);
+    if (!mine.length) return a + pctServ(r);
+    const ate = mine.filter(m => new Date(m.em) <= fim).pop();
+    return a + (ate ? +ate.pct : 0);
+  }, 0) / rows.length;
+}
+function renderEvo() {
+  const box = $('evo'); box.innerHTML = '';
+  $('evo-sem').setAttribute('aria-pressed', String(evoMode === 'sem')); $('evo-mes').setAttribute('aria-pressed', String(evoMode === 'mes'));
+  const ends = fimPeriodos();
+  if (!ends.length) { box.appendChild(el('p', 'note', 'Ainda não há medições registradas no histórico. A evolução aparece a partir da primeira "Salvar medição".')); return; }
+  let prev = null;
+  ends.forEach(fim => {
+    const p = geralEm(fim);
+    const lbl = evoMode === 'sem' ? 'Semana até ' + fim.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : fim.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const dl = prev == null ? '' : ` (${p - prev >= 0 ? '+' : ''}${Math.round(p - prev)} p.p.)`;
+    const row = el('div', 'row'); row.append(el('span', 'nm', lbl + dl), bar(p), el('span', 'pc num', fmt(p)));
+    box.appendChild(row); prev = p;
+  });
+}
+
+/* ---------- editor ---------- */
+function editor(r) {
+  const box = el('div', 'ed');
+  const dados = el('div', 'grid2');
+  const campo = (lbl, key, opts = {}) => {
+    const l = el('label', opts.full ? 'full' : null, lbl); const i = el(opts.area ? 'textarea' : 'input');
+    if (opts.type) i.type = opts.type; if (opts.list) i.setAttribute('list', opts.list); if (opts.area) i.rows = 2;
+    i.value = draft[key] == null ? '' : draft[key]; i.addEventListener('input', () => { draft[key] = i.value; });
+    l.appendChild(i); dados.appendChild(l);
+  };
+  campo('Serviço', 'servico', { full: true }); campo('Escola', 'escola', { list: 'dl-esc' });
+  campo('Prioridade / item nº', 'prioridade', { type: 'number' }); campo('Tipo', 'tipo', { list: 'dl-tipo' });
+  campo('Descrição', 'descricao', { full: true, area: true });
+  const ul = el('label', 'chk full'); const ucb = el('input'); ucb.type = 'checkbox'; ucb.checked = !!draft.urgente; ucb.addEventListener('change', () => { draft.urgente = ucb.checked; });
+  ul.append(ucb, document.createTextNode('Urgente (risco)')); dados.appendChild(ul);
+  box.appendChild(dados);
+  const hdr =el('div', 'erow h'); hdr.append(el('span', null, 'Etapa'), el('span', null, 'Peso'), el('span', null, '% exec.'), el('span')); box.appendChild(hdr);
+  const sum = el('div', 'sum');
+  const upd = () => { const tp = draft.etapas.reduce((a, e) => a + (+e.peso || 0), 0); sum.textContent = `Soma dos pesos: ${tp}% · avanço do serviço: ${fmt(pctServ({ etapas: draft.etapas }))}`; sum.classList.toggle('bad', tp !== 100); };
+  draft.etapas.forEach((e, i) => {
+    const row = el('div', 'erow');
+    const n = el('input'); n.value = e.nome; n.setAttribute('aria-label', 'Nome da etapa'); n.addEventListener('input', () => { e.nome = n.value; });
+    const w = el('input'); w.type = 'number'; w.min = 0; w.max = 100; w.value = e.peso; w.setAttribute('aria-label', 'Peso da etapa'); w.addEventListener('input', () => { e.peso = Math.max(0, Math.min(100, +w.value || 0)); upd(); });
+    const p = el('input'); p.type = 'number'; p.min = 0; p.max = 100; p.step = 5; p.value = e.pct; p.setAttribute('aria-label', '% executado da etapa'); p.addEventListener('input', () => { e.pct = Math.max(0, Math.min(100, +p.value || 0)); upd(); });
+    const x = el('button', 'x', '×'); x.type = 'button'; x.title = 'Remover etapa'; x.setAttribute('aria-label', 'Remover etapa'); x.addEventListener('click', () => { draft.etapas.splice(i, 1); render(); });
+    const q = el('div', 'quick');
+    [0, 25, 50, 75, 100].forEach(v => { const b = el('button', null, v + '%'); b.type = 'button'; b.addEventListener('click', () => { e.pct = v; p.value = v; upd(); }); q.appendChild(b); });
+    row.append(n, w, p, x, q); box.appendChild(row);
+  });
+  const add = el('button', 'lnk', '+ Adicionar etapa'); add.type = 'button'; add.style.alignSelf = 'flex-start';
+  add.addEventListener('click', () => { draft.etapas.push({ nome: 'Nova etapa', peso: 0, pct: 0 }); render(); });
+  box.append(add, sum);
+  const chk = el('label', 'chk'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = !!draft.paralisado; cb.addEventListener('change', () => { draft.paralisado = cb.checked; }); chk.append(cb, document.createTextNode('Serviço paralisado')); box.appendChild(chk);
+  const ta = el('textarea'); ta.rows = 2; ta.placeholder = 'Observação (ex.: motivo da paralisação, pendências, materiais)'; ta.value = draft.obs || ''; ta.addEventListener('input', () => { draft.obs = ta.value; }); box.appendChild(ta);
+  const acts = el('div', 'acts');
+  const sv = el('button', 'btn sm', 'Salvar medição'); sv.type = 'button';
+  sv.addEventListener('click', async () => { sv.disabled = true; await salvarMedicao(r); sv.disabled = false; });
+  const cc = el('button', 'btn ghost sm', 'Cancelar'); cc.type = 'button'; cc.addEventListener('click', () => { editing = null; draft = null; confirmDel = null; render(); if (pendingReload) { pendingReload = false; load(); } });
+  acts.append(sv, cc);
+  if (confirmDel === r.id) {
+    const cf = el('div', 'confirm'); cf.appendChild(el('span', null, 'Excluir este serviço e suas etapas?'));
+    const y = el('button', 'btn red sm', 'Excluir'); y.type = 'button'; y.addEventListener('click', () => excluirServico(r));
+    const n2 = el('button', 'btn ghost sm', 'Não'); n2.type = 'button'; n2.addEventListener('click', () => { confirmDel = null; render(); });
+    cf.append(y, n2); box.append(acts, cf);
+  } else {
+    const d = el('button', 'lnk danger', 'Excluir serviço'); d.type = 'button'; d.addEventListener('click', () => { confirmDel = r.id; render(); });
+    acts.appendChild(d); box.appendChild(acts);
+  }
+  upd();
+  return box;
+}
+
+function card(r) {
+  const p = pctServ(r), s = sit(r);
+  const c = el('div', 'svc');
+  const h = el('div', 'head');
+  h.append(el('span', 'pri', /ETI/i.test(r.origem) ? `${r.prioridade}ª prioridade` : `Item ${r.prioridade}`), el('span', 'pc num', fmt(p)), el('h4', null, r.servico));
+  c.appendChild(h);
+  c.appendChild(bar(p, r.paralisado ? 'var(--st-par)' : null));
+  const tags = el('div', 'tags');
+  const sp = el('span', 'pill st', s.v); sp.style.setProperty('--c', `var(--st-${s.k})`); sp.style.setProperty('--cb', `var(--st-${s.k}-bg)`); tags.appendChild(sp);
+  if (r.urgente) tags.appendChild(el('span', 'pill urg', 'Urgente · risco'));
+  if (r.tipo) tags.appendChild(el('span', 'pill', r.tipo));
+  c.appendChild(tags);
+  if (r.descricao) c.appendChild(el('div', 'desc', r.descricao));
+  if (editing === r.id) c.appendChild(editor(r));
+  else {
+    const ul = el('ul', 'etapas');
+    r.etapas.forEach(e => {
+      const li = el('li');
+      const n = el('span', 'en'); n.append(document.createTextNode(e.nome + ' '), el('small', null, `(peso ${+e.peso}%)`));
+      li.append(n, el('span', 'ep num', fmt(+e.pct)), bar(+e.pct, null, '6px'));
+      ul.appendChild(li);
+    });
+    c.appendChild(ul);
+    if (r.obs) c.appendChild(el('div', 'obs' + (r.paralisado ? ' par' : ''), r.obs));
+  }
+  const hs = meds.filter(m => m.servico_id === r.id);
+  if (histOpen.has(r.id)) {
+    const ul = el('ul', 'hist');
+    if (!hs.length) ul.appendChild(el('li', null, 'Nenhuma medição registrada ainda.'));
+    hs.slice().reverse().forEach(m => {
+      const li = el('li'); li.append(el('b', null, fmt(+m.pct)), document.createTextNode(' · ' + fmtData(m.em) + (m.usuario ? ' · ' + m.usuario : '')));
+      const mud = (m.detalhes || []).map(d => `${d.nome}: ${d.de == null ? 'nova' : d.de + '%'} → ${d.para}%`).join('; ');
+      if (mud) li.append(document.createElement('br'), document.createTextNode(mud));
+      ul.appendChild(li);
+    });
+    c.appendChild(ul);
+  }
+  const f = el('div', 'foot');
+  f.appendChild(el('span', null, r.atualizado_em ? 'Atualizado ' + fmtData(r.atualizado_em) + (r.atualizado_por ? ' por ' + r.atualizado_por : '') : ''));
+  const acts = el('span', 'acts'); acts.style.display = 'flex'; acts.style.gap = '.8rem';
+  const hb = el('button', 'lnk', (histOpen.has(r.id) ? 'Ocultar histórico' : 'Histórico') + ` (${hs.length})`); hb.type = 'button';
+  hb.addEventListener('click', () => { histOpen.has(r.id) ? histOpen.delete(r.id) : histOpen.add(r.id); render(); });
+  acts.appendChild(hb);
+  if (canWrite() && editing !== r.id) {
+    const b = el('button', 'lnk', 'Atualizar medição'); b.type = 'button';
+    b.addEventListener('click', () => { editing = r.id; confirmDel = null; draft = { etapas: r.etapas.map(e => ({ id: e.id, nome: e.nome, peso: +e.peso, pct: +e.pct })), paralisado: r.paralisado, obs: r.obs, servico: r.servico, escola: r.escola, prioridade: r.prioridade, tipo: r.tipo, descricao: r.descricao, urgente: r.urgente }; render(); });
+    acts.appendChild(b);
+  }
+  f.appendChild(acts);
+  c.appendChild(f);
+  return c;
+}
+
+function render() {
+  renderAuth(); renderTop();
+  const box = $('schools'); box.innerHTML = '';
+  if (!rows.length) return;
+  const q = $('q').value.trim().toLowerCase(), fe = $('fesc').value;
+  const ok = (r) => (!fe || r.escola === fe) &&
+    (!filtro || (filtro === 'urgente' ? r.urgente : sit(r).v === filtro)) &&
+    (!q || (r.escola + ' ' + r.servico + ' ' + (r.descricao || '') + ' ' + (r.tipo || '') + ' ' + (r.obs || '')).toLowerCase().includes(q));
+  let shown = 0;
+  escolas().forEach((e, idx) => {
+    const all = rows.filter(r => r.escola === e);
+    const vis = all.filter(ok).sort((a, b) => a.prioridade - b.prioridade);
+    if (!vis.length) return;
+    shown++;
+    const art = el('article', 'school'); art.id = 'esc-' + idx;
+    const hd = el('header'); const left = el('div');
+    left.append(el('h3', null, e));
+    const og = el('div', 'origem'); og.append(el('span', 'pill', all[0].origem), el('span', null, `${all.length} serviço${all.length > 1 ? 's' : ''}`)); left.appendChild(og);
+    const p = avg(all);
+    hd.append(left, el('span', 'spc num', fmt(p)), bar(p));
+    art.appendChild(hd);
+    const g = el('div', 'svcs'); vis.forEach(r => g.appendChild(card(r))); art.appendChild(g);
+    box.appendChild(art);
+  });
+  if (!shown) box.appendChild(el('div', 'empty', 'Nenhum serviço com esses filtros.'));
+}
+
+/* ---------- formulários ---------- */
+$('evo-sem').addEventListener('click', () => { evoMode = 'sem'; renderEvo(); });
+$('evo-mes').addEventListener('click', () => { evoMode = 'mes'; renderEvo(); });
+window.addEventListener('beforeprint', () => { $('printed').textContent = 'Relatório gerado em ' + fmtData(new Date().toISOString()); });
+$('q').addEventListener('input', render);
+$('fesc').addEventListener('change', render);
+$('l-cancel').addEventListener('click', () => { $('login').hidden = true; });
+$('login').addEventListener('submit', async (ev) => {
+  ev.preventDefault(); $('l-err').hidden = true; $('l-go').disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email: $('l-email').value.trim(), password: $('l-pass').value });
+  $('l-go').disabled = false;
+  if (error) { $('l-err').textContent = 'E-mail ou senha incorretos, ou usuário não cadastrado no Supabase.'; $('l-err').hidden = false; return; }
+  $('login').hidden = true; $('l-pass').value = ''; toast('Login feito. Agora você pode atualizar as medições.');
+});
+$('a-cancel').addEventListener('click', () => { $('addform').hidden = true; });
+$('addform').addEventListener('submit', async (ev) => {
+  ev.preventDefault(); $('a-go').disabled = true;
+  try {
+    const { data, error } = await sb.from('servicos').insert({
+      escola: $('a-escola').value.trim(), origem: $('a-origem').value.trim() || 'Plano ETI 2026', prioridade: +$('a-pri').value || 1,
+      servico: $('a-serv').value.trim(), tipo: $('a-tipo').value.trim(), descricao: $('a-desc').value.trim(), urgente: $('a-urg').checked,
+      atualizado_por: session ? session.user.email : null
+    }).select().single();
+    if (error) throw error;
+    const r2 = await sb.from('etapas').insert(TEMPLATE.map(([nome, peso], i) => ({ servico_id: data.id, ordem: i + 1, nome, peso, pct: 0 })));
+    if (r2.error) throw r2.error;
+    ['a-serv', 'a-desc'].forEach(id => $(id).value = ''); $('a-urg').checked = false; $('addform').hidden = true;
+    toast('Serviço adicionado'); await load();
+  } catch (e) { toast('Não foi possível salvar: ' + (e.message || 'erro')); }
+  $('a-go').disabled = false;
+});
+
+/* ---------- início ---------- */
+(async () => {
+  if (!window.supabase || /COLE_AQUI/.test(SUPABASE_URL + SUPABASE_ANON_KEY)) { $('cfgwarn').hidden = false; msg(''); render(); return; }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data } = await sb.auth.getSession(); session = data.session;
+  sb.auth.onAuthStateChange((_e, s) => { session = s; if (!s) { editing = null; draft = null; $('addform').hidden = true; } render(); });
+  await load();
+  sb.channel('painel-escolas')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'servicos' }, scheduleReload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'etapas' }, scheduleReload)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'medicoes' }, scheduleReload)
+    .subscribe();
+})();
+</script>
+</body>
+</html>
